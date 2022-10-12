@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"log"
 	"math/rand"
 	"os"
@@ -39,7 +40,7 @@ func CreateTxt() {
 // Possible Approach:
 // 1. External sort - read the file in chunks of 1GB, sort each chunk and write it to a new file. Repeat until the whole file is sorted. Then merge the sorted chunks into one file.
 
-func SortLargeFile(ram int) {
+func SortLargeFile(ram int, i *int) {
 	file, err := os.Open("100GB.txt")
 	if err != nil {
 		log.Fatal(err)
@@ -49,7 +50,6 @@ func SortLargeFile(ram int) {
 	chunkSize := int64(float64(ram) * 0.8) // in bytes
 	var totalRead int64
 	var totalChunkRead int64
-	i := 0
 
 	scan := bufio.NewScanner(file)
 
@@ -57,6 +57,7 @@ func SortLargeFile(ram int) {
 	var chunk []int64
 
 	for scan.Scan() {
+		// append to chunk
 		value, _ := strconv.ParseInt(scan.Text(), 10, 64)
 		chunk = append(chunk, value)
 		bytesLen := len(scan.Bytes())
@@ -71,11 +72,10 @@ func SortLargeFile(ram int) {
 			})
 
 			// write the first chunk to a new file
-			f, err := os.Create("chunk_" + strconv.Itoa(i) + ".txt")
+			f, err := os.Create("chunk_" + strconv.Itoa(*i) + ".txt")
 			if err != nil {
 				log.Fatal(err)
 			}
-			defer f.Close()
 
 			w := bufio.NewWriter(f)
 			for _, v := range chunk {
@@ -86,7 +86,10 @@ func SortLargeFile(ram int) {
 			// reset the chunk
 			chunk = []int64{}
 			totalRead = 0
-			i++
+			*i++
+
+			f.Chmod(0600)
+			f.Close()
 		}
 
 		if !scan.Scan() {
@@ -96,11 +99,10 @@ func SortLargeFile(ram int) {
 			})
 
 			// write the first chunk to a new file
-			f, err := os.Create("chunk_" + strconv.Itoa(i) + ".txt")
+			f, err := os.Create("chunk_" + strconv.Itoa(*i) + ".txt")
 			if err != nil {
 				log.Fatal(err)
 			}
-			defer f.Close()
 
 			w := bufio.NewWriter(f)
 			for _, v := range chunk {
@@ -112,8 +114,11 @@ func SortLargeFile(ram int) {
 			// reset the chunk
 			chunk = []int64{}
 			totalRead = 0
-			i++
+
+			f.Chmod(0600)
+			f.Close()
 		} else {
+			// append to chunk
 			value, _ := strconv.ParseInt(scan.Text(), 10, 64)
 			chunk = append(chunk, value)
 			bytesLen := len(scan.Bytes())
@@ -122,7 +127,104 @@ func SortLargeFile(ram int) {
 		}
 
 	}
+}
 
+func MergeKSortedFiles(i int) {
+	outfile, err := os.OpenFile("sorted.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// iterate over sorted chunk files
+	for {
+
+		type Heap struct {
+			Val int64
+			Idx int
+		}
+
+		heap := make([]Heap, 0)
+		for j := 0; j <= i; j++ {
+			// open each file
+			file, err := os.OpenFile("chunk_"+strconv.Itoa(j)+".txt", os.O_RDONLY, 0600)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			// read the first line
+			scan := bufio.NewScanner(file)
+
+			for scan.Scan() {
+				value, _ := strconv.ParseInt(scan.Text(), 10, 64)
+				fmt.Println("value", value)
+				heap = append(heap, Heap{
+					Val: value,
+					Idx: j,
+				})
+				break
+			}
+
+			file.Close()
+		}
+
+		if len(heap) == 0 {
+			break
+		}
+
+		// sort the heap
+		sort.Slice(heap, func(i, j int) bool {
+			return heap[i].Val < heap[j].Val
+		})
+
+		outfile.WriteString(strconv.FormatInt(heap[0].Val, 10) + "\r")
+
+		// open the file with the smallest value and remove the first line
+		file, err := os.OpenFile("chunk_"+strconv.Itoa(heap[0].Idx)+".txt", os.O_RDONLY, 0600)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// read the first line
+		scan := bufio.NewScanner(file)
+		var lines []string
+		scan.Scan()
+		for scan.Scan() {
+			lines = append(lines, scan.Text())
+		}
+		file.Close()
+
+		if len(lines) > 1 {
+
+			// remove the first line
+			lines = lines[1:]
+
+			// write the lines back to the file
+			f, err := os.Create("chunk_" + strconv.Itoa(heap[0].Idx) + ".txt")
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			w := bufio.NewWriter(f)
+			for _, v := range lines {
+				w.WriteString(v + "\r")
+			}
+			w.Flush()
+
+			f.Chmod(0600)
+			f.Close()
+		}
+
+		// reset the heap
+		fmt.Println("heap reset")
+		heap = []Heap{}
+	}
+
+	// delete the chunk files
+	// for j := 0; j <= i; j++ {
+	// 	os.Remove("chunk_" + strconv.Itoa(j) + ".txt")
+	// }
+
+	outfile.Close()
 }
 
 func main() {
@@ -130,5 +232,7 @@ func main() {
 	// 1. ram size in GB
 	// 2. sort direction
 	// CreateTxt()
-	SortLargeFile(int(0.5 * 1024 * 1024))
+	i := 0
+	SortLargeFile(int(0.5*1024*1024), &i)
+	MergeKSortedFiles(i)
 }
