@@ -12,7 +12,7 @@ import (
 
 // create a txt file of size 100GB with each line containing a random
 func CreateTxt() {
-	f, err := os.Create("100GB.txt")
+	f, err := os.OpenFile("100GB.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func SortLargeFile(ram int, i *int, sortDirection string) {
 			})
 
 			// write the first chunk to a new file
-			f, err := os.Create("chunk_" + strconv.Itoa(*i) + ".txt")
+			f, err := os.OpenFile("chunk_"+strconv.Itoa(*i)+".txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -93,7 +93,6 @@ func SortLargeFile(ram int, i *int, sortDirection string) {
 			totalRead = 0
 			*i++
 
-			f.Chmod(0600)
 			f.Close()
 		}
 
@@ -108,7 +107,7 @@ func SortLargeFile(ram int, i *int, sortDirection string) {
 			})
 
 			// write the first chunk to a new file
-			f, err := os.Create("chunk_" + strconv.Itoa(*i) + ".txt")
+			f, err := os.OpenFile("chunk_"+strconv.Itoa(*i)+".txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -124,7 +123,6 @@ func SortLargeFile(ram int, i *int, sortDirection string) {
 			chunk = []int64{}
 			totalRead = 0
 
-			f.Chmod(0600)
 			f.Close()
 		} else {
 			// append to chunk
@@ -139,7 +137,7 @@ func SortLargeFile(ram int, i *int, sortDirection string) {
 }
 
 func MergeKSortedFiles(i int, sortDirection string) {
-	outfile, err := os.OpenFile("sorted.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	outfile, err := os.OpenFile("sorted.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -155,7 +153,7 @@ func MergeKSortedFiles(i int, sortDirection string) {
 		heap := make([]Heap, 0)
 		for j := 0; j <= i; j++ {
 			// open each file
-			file, err := os.OpenFile("chunk_"+strconv.Itoa(j)+".txt", os.O_RDONLY, 0600)
+			file, err := os.Open("chunk_" + strconv.Itoa(j) + ".txt")
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -192,7 +190,7 @@ func MergeKSortedFiles(i int, sortDirection string) {
 		outfile.WriteString(strconv.FormatInt(heap[0].Val, 10) + "\r")
 
 		// open the file with the smallest value and remove the first line
-		file, err := os.OpenFile("chunk_"+strconv.Itoa(heap[0].Idx)+".txt", os.O_RDONLY, 0600)
+		file, err := os.Open("chunk_" + strconv.Itoa(heap[0].Idx) + ".txt")
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -212,7 +210,7 @@ func MergeKSortedFiles(i int, sortDirection string) {
 			lines = lines[1:]
 
 			// write the lines back to the file
-			f, err := os.Create("chunk_" + strconv.Itoa(heap[0].Idx) + ".txt")
+			f, err := os.OpenFile("chunk_"+strconv.Itoa(heap[0].Idx)+".txt", os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -223,7 +221,6 @@ func MergeKSortedFiles(i int, sortDirection string) {
 			}
 			w.Flush()
 
-			f.Chmod(0600)
 			f.Close()
 		}
 
