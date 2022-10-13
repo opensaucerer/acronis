@@ -215,7 +215,6 @@ func MergeKSortedFiles(i int) {
 		}
 
 		// reset the heap
-		fmt.Println("heap reset")
 		heap = []Heap{}
 	}
 
