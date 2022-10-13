@@ -8,41 +8,27 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
+
+	"github.com/urfave/cli"
 )
 
 // create a txt file of size 100GB with each line containing a random
-func CreateTxt() {
-	f, err := os.OpenFile("100GB.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+func CreateTxt(filepath string, size int64) {
+	f, err := os.OpenFile(filepath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer f.Close()
-
 	w := bufio.NewWriter(f)
-	for i := 0; i < 10000000; i++ {
-		w.WriteString(strconv.Itoa(rand.Intn(1000000000)) + "\r")
+	for i := int64(0); i < size; i++ {
+		w.WriteString(strconv.FormatInt(int64(rand.Intn(int(size))), 10) + "\r")
 	}
 	w.Flush()
+	f.Close()
 }
 
-// Problem: There is a text file with a number in each line, the size of the file is 100GB. Need to write a GoLang command-line program to create a new file sorted in increasing order. It’s not allowed to use more than 1Gb of RAM.
-
-// Restrictions:
-// 1. sort the file in increasing order
-// 2. use no more than 1GB of RAM
-// 3. the file size is 100GB
-// 4. the file contains only numbers
-// 5. the file is not sorted
-
-// Questions:
-// 1. does file contain duplicate numbers?
-
-// Solution:
-// 1. External sort - read the file in chunks of 1GB, sort each chunk and write it to a new file. Repeat until the whole file is sorted.
-// 2. K-way Merge - merge all of the sorted chunks into one file.
-
-func SortLargeFile(ram int, i *int, sortDirection string) {
-	file, err := os.Open("100GB.txt")
+func SortLargeFile(filepath string, ram int64, i *int, sortDirection string) {
+	file, err := os.Open(filepath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -136,8 +122,8 @@ func SortLargeFile(ram int, i *int, sortDirection string) {
 	}
 }
 
-func MergeKSortedFiles(i int, sortDirection string) {
-	outfile, err := os.OpenFile("sorted.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+func MergeKSortedFiles(outpath string, i int, sortDirection string) {
+	outfile, err := os.OpenFile(outpath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -228,11 +214,152 @@ func MergeKSortedFiles(i int, sortDirection string) {
 	}
 
 	// delete the chunk files
-	// for j := 0; j <= i; j++ {
-	// 	os.Remove("chunk_" + strconv.Itoa(j) + ".txt")
-	// }
+	for j := 0; j <= i; j++ {
+		os.Remove("chunk_" + strconv.Itoa(j) + ".txt")
+	}
 
 	outfile.Close()
+}
+
+var app = cli.NewApp()
+
+func info() {
+	app.Name = "Simple CLI tool for sorting txt files"
+	app.Usage = `Sort a txt file with RAM restrictions
+	Usage: acronis --file <file> --direction <sort direction> --ram <max memory in MB> -outpath <output file>
+
+	Example:
+	acronis sort --file /path/to/input.txt --ram 100 --direction asc
+	acronis sort --file /path/to/input.txt --ram 100 --direction asc --outpath /path/to/output.txt`
+	app.Author = "Perfection (https://github.com/opensaucerer)"
+	app.Version = "0.0.1"
+}
+
+func commands() {
+	app.Commands = []cli.Command{
+		{
+			Name:    "sort",
+			Aliases: []string{"s"},
+			Usage: `Sort a txt file with RAM restrictions
+						acronis sort --file /path/to/input.txt --ram 100 --direction asc
+						acronis sort --file /path/to/input.txt --ram 100 --direction asc --outpath /path/to/output.txt`,
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:     "file",
+					Usage:    "Path to the input file",
+					Required: true,
+				},
+				&cli.StringFlag{
+					Name:     "direction",
+					Usage:    "Sort direction (asc or desc)",
+					Required: true,
+				},
+				&cli.StringFlag{
+					Name:     "outpath",
+					Usage:    "Output path for the sorted file (defaults to sorted.txt in curr dir)",
+					Required: false,
+				},
+				&cli.StringFlag{
+					Name:     "ram",
+					Usage:    "RAM limit in MB",
+					Required: true,
+				},
+			},
+			Action: func(c *cli.Context) {
+				// get the RAM limit
+				ram := c.String("ram")
+				var r int64
+				if strings.Contains(ram, ".") {
+					// parse the float
+					ramFloat, err := strconv.ParseFloat(ram, 64)
+					if err != nil {
+						log.Fatal(err)
+					}
+					r = int64(ramFloat * 1024 * 1024)
+				} else {
+					// parse the int
+					ramInt, err := strconv.ParseInt(ram, 10, 64)
+					if err != nil {
+						log.Fatal(err)
+					}
+					r = ramInt * 1024 * 1024
+				}
+
+				dir := c.String("direction")
+
+				outpath := c.String("outpath")
+				if outpath == "" {
+					outpath = "sorted.txt"
+				}
+
+				fmt.Printf("Sorting %s with %s MB (%d bytes) of RAM in %s direction. Output file: %s\n", c.String("file"), ram, r, dir, outpath)
+
+				filepath := c.String("file")
+				// validate that it's a txt file
+				s := strings.Split(filepath, ".")
+				if s[len(s)-1] != "txt" {
+					log.Fatal("File is not a txt file")
+				}
+
+				// sort and merge
+				i := 0
+				SortLargeFile(filepath, r, &i, dir)
+				MergeKSortedFiles(outpath, i, dir)
+
+				fmt.Println("Sorted file saved to", outpath)
+			},
+		},
+
+		{
+			Name:    "create",
+			Aliases: []string{"c"},
+			Usage:   "Create a txt file with random numbers",
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:     "size",
+					Usage:    "Size of the file in MB",
+					Required: true,
+				},
+				&cli.StringFlag{
+					Name:     "outpath",
+					Usage:    "Output path for the sorted file (defaults to lacronis.txt in curr dir)",
+					Required: false,
+				},
+			},
+			Action: func(c *cli.Context) {
+				// get the file size
+				size := c.String("size")
+				var s int64
+				if strings.Contains(size, ".") {
+					// parse the float
+					sizeFloat, err := strconv.ParseFloat(size, 64)
+					if err != nil {
+						log.Fatal(err)
+					}
+					s = int64(sizeFloat * 1024 * 1024)
+				} else {
+					// parse the int
+					sizeInt, err := strconv.ParseInt(size, 10, 64)
+					if err != nil {
+						log.Fatal(err)
+					}
+					s = sizeInt * 1024 * 1024
+				}
+
+				outpath := c.String("outpath")
+				if outpath == "" {
+					outpath = "lacronis.txt"
+				}
+
+				fmt.Printf("Creating a random txt file of size %s MB (%d bytes) at %s\n", size, s, outpath)
+
+				// create the file
+				CreateTxt(outpath, s)
+
+				fmt.Println("Random txt file saved to", outpath)
+			},
+		},
+	}
 }
 
 func main() {
@@ -240,8 +367,34 @@ func main() {
 	// 1. ram size in GB
 	// 2. sort direction
 	// CreateTxt()
-	i := 0
-	dir := "asc"
-	SortLargeFile(int(0.5*1024*1024), &i, dir)
-	MergeKSortedFiles(i, dir)
+	// i := 0
+	// dir := "asc"
+	// SortLargeFile(int(0.5*1024*1024), &i, dir)
+	// MergeKSortedFiles(i, dir)
+	// for i < 2 {
+	// 	f, _ := os.Open(fmt.Sprintf("chunk_%d.txt", i))
+	// 	info, _ := f.Stat()
+	// 	// get file mode
+	// 	fmt.Println(info.Mode())
+	// 	// get file permission
+	// 	fmt.Println(info.Mode().Perm())
+	// 	// get mode type
+	// 	fmt.Println(info.Mode().Type())
+	// 	// get mode in string
+	// 	fmt.Println(info.Mode().IsRegular())
+
+	// 	b := bufio.NewScanner(f)
+	// 	for b.Scan() {
+	// 		fmt.Printf("from chunk %d: %s\n", i, b.Text())
+	// 		break
+	// 	}
+
+	// 	i++
+	// }
+	info()
+	commands()
+	err := app.Run(os.Args)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
