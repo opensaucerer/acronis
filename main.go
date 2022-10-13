@@ -198,7 +198,6 @@ func MergeKSortedFiles(i int, sortDirection string) {
 		// read the first line
 		scan := bufio.NewScanner(file)
 		var lines []string
-		scan.Scan()
 		for scan.Scan() {
 			lines = append(lines, scan.Text())
 		}
