@@ -15,12 +15,16 @@ import (
 
 // create a txt file of size 100GB with each line containing a random
 func CreateTxt(filepath string, size int64) {
-	f, err := os.OpenFile(filepath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.Create(filepath)
 	if err != nil {
 		log.Fatal(err)
 	}
 	w := bufio.NewWriter(f)
 	for i := int64(0); i < size; i++ {
+		inf, _ := f.Stat()
+		if inf.Size() >= size {
+			break
+		}
 		w.WriteString(strconv.FormatInt(int64(rand.Intn(int(size))), 10) + "\r")
 	}
 	w.Flush()
@@ -141,6 +145,7 @@ func MergeKSortedFiles(outpath string, i int, sortDirection string) {
 			// open each file
 			file, err := os.Open("chunk_" + strconv.Itoa(j) + ".txt")
 			if err != nil {
+				os.Remove(outpath)
 				log.Fatal(err)
 			}
 
@@ -178,6 +183,7 @@ func MergeKSortedFiles(outpath string, i int, sortDirection string) {
 		// open the file with the smallest value and remove the first line
 		file, err := os.Open("chunk_" + strconv.Itoa(heap[0].Idx) + ".txt")
 		if err != nil {
+			os.Remove(outpath)
 			log.Fatal(err)
 		}
 
@@ -197,6 +203,7 @@ func MergeKSortedFiles(outpath string, i int, sortDirection string) {
 			// write the lines back to the file
 			f, err := os.OpenFile("chunk_"+strconv.Itoa(heap[0].Idx)+".txt", os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
 			if err != nil {
+				os.Remove(outpath)
 				log.Fatal(err)
 			}
 
@@ -363,34 +370,6 @@ func commands() {
 }
 
 func main() {
-	// args ---
-	// 1. ram size in GB
-	// 2. sort direction
-	// CreateTxt()
-	// i := 0
-	// dir := "asc"
-	// SortLargeFile(int(0.5*1024*1024), &i, dir)
-	// MergeKSortedFiles(i, dir)
-	// for i < 2 {
-	// 	f, _ := os.Open(fmt.Sprintf("chunk_%d.txt", i))
-	// 	info, _ := f.Stat()
-	// 	// get file mode
-	// 	fmt.Println(info.Mode())
-	// 	// get file permission
-	// 	fmt.Println(info.Mode().Perm())
-	// 	// get mode type
-	// 	fmt.Println(info.Mode().Type())
-	// 	// get mode in string
-	// 	fmt.Println(info.Mode().IsRegular())
-
-	// 	b := bufio.NewScanner(f)
-	// 	for b.Scan() {
-	// 		fmt.Printf("from chunk %d: %s\n", i, b.Text())
-	// 		break
-	// 	}
-
-	// 	i++
-	// }
 	info()
 	commands()
 	err := app.Run(os.Args)
