@@ -37,10 +37,11 @@ func CreateTxt() {
 // Questions:
 // 1. does file contain duplicate numbers?
 
-// Possible Approach:
-// 1. External sort - read the file in chunks of 1GB, sort each chunk and write it to a new file. Repeat until the whole file is sorted. Then merge the sorted chunks into one file.
+// Solution:
+// 1. External sort - read the file in chunks of 1GB, sort each chunk and write it to a new file. Repeat until the whole file is sorted.
+// 2. K-way Merge - merge all of the sorted chunks into one file.
 
-func SortLargeFile(ram int, i *int) {
+func SortLargeFile(ram int, i *int, sortDirection string) {
 	file, err := os.Open("100GB.txt")
 	if err != nil {
 		log.Fatal(err)
@@ -67,8 +68,12 @@ func SortLargeFile(ram int, i *int) {
 		if totalRead >= chunkSize {
 
 			// sort the chunk
-			sort.Slice(chunk, func(i, j int) bool {
-				return chunk[i] < chunk[j]
+			sort.SliceStable(chunk, func(i, j int) bool {
+				if sortDirection == "asc" {
+					return chunk[i] < chunk[j]
+				} else {
+					return chunk[i] > chunk[j]
+				}
 			})
 
 			// write the first chunk to a new file
@@ -94,8 +99,12 @@ func SortLargeFile(ram int, i *int) {
 
 		if !scan.Scan() {
 			// sort the chunk
-			sort.Slice(chunk, func(i, j int) bool {
-				return chunk[i] < chunk[j]
+			sort.SliceStable(chunk, func(i, j int) bool {
+				if sortDirection == "asc" {
+					return chunk[i] < chunk[j]
+				} else {
+					return chunk[i] > chunk[j]
+				}
 			})
 
 			// write the first chunk to a new file
@@ -129,7 +138,7 @@ func SortLargeFile(ram int, i *int) {
 	}
 }
 
-func MergeKSortedFiles(i int) {
+func MergeKSortedFiles(i int, sortDirection string) {
 	outfile, err := os.OpenFile("sorted.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {
 		log.Fatal(err)
@@ -172,8 +181,12 @@ func MergeKSortedFiles(i int) {
 		}
 
 		// sort the heap
-		sort.Slice(heap, func(i, j int) bool {
-			return heap[i].Val < heap[j].Val
+		sort.SliceStable(heap, func(i, j int) bool {
+			if sortDirection == "asc" {
+				return heap[i].Val < heap[j].Val
+			} else {
+				return heap[i].Val > heap[j].Val
+			}
 		})
 
 		outfile.WriteString(strconv.FormatInt(heap[0].Val, 10) + "\r")
@@ -232,6 +245,7 @@ func main() {
 	// 2. sort direction
 	// CreateTxt()
 	i := 0
-	SortLargeFile(int(0.5*1024*1024), &i)
-	MergeKSortedFiles(i)
+	dir := "asc"
+	SortLargeFile(int(0.5*1024*1024), &i, dir)
+	MergeKSortedFiles(i, dir)
 }
