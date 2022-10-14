@@ -6,9 +6,9 @@ import (
 	"io"
 	"log"
 	"os"
-	"strconv"
 )
 
+// first trial at chunking file without using a bufio scanner
 func SortLargeFile1(ram int) {
 	file, err := os.Open("100GB.txt")
 	if err != nil {
@@ -65,85 +65,5 @@ func SortLargeFile1(ram int) {
 		if totalRead >= int(fileSize) {
 			break
 		}
-	}
-}
-
-func SortLargeFile2(ram int) {
-	file, err := os.Open("100GB.txt")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
-
-	chunkSize := int64(float64(ram) * 0.8) // in bytes
-	var totalRead int64
-	var totalChunkRead int64
-	fileInfo, _ := file.Stat()
-	fileSize := fileInfo.Size()
-	i := 0
-
-	scan := bufio.NewScanner(file)
-
-	// read the first chunk of the file
-	var chunk []string
-
-	for scan.Scan() {
-		chunk = append(chunk, scan.Text())
-		bytesLen := len(chunk)
-		totalRead += int64(bytesLen)
-		totalChunkRead += int64(bytesLen)
-
-		fmt.Println("chunk size", chunkSize)
-		fmt.Println("totalRead", totalRead)
-		fmt.Println("fileSize", fileSize)
-		fmt.Println("totalChunkRead", totalChunkRead)
-		if totalRead >= chunkSize {
-
-			// write the first chunk to a new file
-			f, err := os.Create("chunk_" + strconv.Itoa(i) + ".txt")
-			if err != nil {
-				log.Fatal(err)
-			}
-			defer f.Close()
-
-			w := bufio.NewWriter(f)
-			for _, v := range chunk {
-				w.WriteString(v + "\r")
-			}
-			w.Flush()
-
-			// reset the chunk
-			chunk = []string{}
-			totalRead = 0
-			i++
-
-			fmt.Println("chunk size:", chunkSize, "chunk size left:", fileSize-totalChunkRead)
-			// if fileSize-totalChunkRead < chunkSize {
-			// 	chunkSize = fileSize - totalChunkRead
-			// 	fmt.Println("new chunk size:", chunkSize)
-			// }
-
-		}
-
-		if !scan.Scan() {
-			// write the first chunk to a new file
-			f, err := os.Create("chunk_" + strconv.Itoa(i) + ".txt")
-			if err != nil {
-				log.Fatal(err)
-			}
-			defer f.Close()
-
-			w := bufio.NewWriter(f)
-			for _, v := range chunk {
-				w.WriteString(v + "\r")
-			}
-			w.Flush()
-
-			// reset the chunk
-			chunk = []string{}
-			totalRead = 0
-			i++
-		}
-
 	}
 }

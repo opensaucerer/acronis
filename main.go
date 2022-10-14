@@ -25,7 +25,7 @@ func CreateTxt(filepath string, size int64) {
 		if inf.Size() >= size {
 			break
 		}
-		w.WriteString(strconv.FormatInt(int64(rand.Intn(int(size))), 10) + "\r")
+		w.WriteString(strconv.FormatInt(int64(rand.Intn(int(size))), 10) + "\n")
 	}
 	w.Flush()
 	f.Close()
@@ -40,7 +40,6 @@ func SortLargeFile(filepath string, ram int64, i *int, sortDirection string) {
 
 	chunkSize := int64(float64(ram) * 0.8) // in bytes
 	var totalRead int64
-	var totalChunkRead int64
 
 	scan := bufio.NewScanner(file)
 
@@ -53,7 +52,6 @@ func SortLargeFile(filepath string, ram int64, i *int, sortDirection string) {
 		chunk = append(chunk, value)
 		bytesLen := len(scan.Bytes())
 		totalRead += int64(bytesLen)
-		totalChunkRead += int64(bytesLen)
 
 		if totalRead >= chunkSize {
 
@@ -67,14 +65,14 @@ func SortLargeFile(filepath string, ram int64, i *int, sortDirection string) {
 			})
 
 			// write the first chunk to a new file
-			f, err := os.OpenFile("chunk_"+strconv.Itoa(*i)+".txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			f, err := os.Create("chunk_" + strconv.Itoa(*i) + ".txt")
 			if err != nil {
 				log.Fatal(err)
 			}
 
 			w := bufio.NewWriter(f)
 			for _, v := range chunk {
-				w.WriteString(strconv.FormatInt(v, 10) + "\r")
+				w.WriteString(strconv.FormatInt(v, 10) + "\n")
 			}
 			w.Flush()
 
@@ -87,6 +85,9 @@ func SortLargeFile(filepath string, ram int64, i *int, sortDirection string) {
 		}
 
 		if !scan.Scan() {
+
+			fmt.Println("Sorting the last chunk...")
+
 			// sort the chunk
 			sort.SliceStable(chunk, func(i, j int) bool {
 				if sortDirection == "asc" {
@@ -97,7 +98,7 @@ func SortLargeFile(filepath string, ram int64, i *int, sortDirection string) {
 			})
 
 			// write the first chunk to a new file
-			f, err := os.OpenFile("chunk_"+strconv.Itoa(*i)+".txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			f, err := os.Create("chunk_" + strconv.Itoa(*i) + ".txt")
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -105,7 +106,7 @@ func SortLargeFile(filepath string, ram int64, i *int, sortDirection string) {
 			w := bufio.NewWriter(f)
 			for _, v := range chunk {
 				// conver int64 to string
-				w.WriteString(strconv.FormatInt(v, 10) + "\r")
+				w.WriteString(strconv.FormatInt(v, 10) + "\n")
 			}
 			w.Flush()
 
@@ -120,14 +121,13 @@ func SortLargeFile(filepath string, ram int64, i *int, sortDirection string) {
 			chunk = append(chunk, value)
 			bytesLen := len(scan.Bytes())
 			totalRead += int64(bytesLen)
-			totalChunkRead += int64(bytesLen)
 		}
 
 	}
 }
 
 func MergeKSortedFiles(outpath string, i int, sortDirection string) {
-	outfile, err := os.OpenFile(outpath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	outfile, err := os.Create(outpath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -153,8 +153,8 @@ func MergeKSortedFiles(outpath string, i int, sortDirection string) {
 			scan := bufio.NewScanner(file)
 
 			for scan.Scan() {
+				// save the first line to the heap
 				value, _ := strconv.ParseInt(scan.Text(), 10, 64)
-				fmt.Println("value", value)
 				heap = append(heap, Heap{
 					Val: value,
 					Idx: j,
@@ -178,7 +178,7 @@ func MergeKSortedFiles(outpath string, i int, sortDirection string) {
 			}
 		})
 
-		outfile.WriteString(strconv.FormatInt(heap[0].Val, 10) + "\r")
+		outfile.WriteString(strconv.FormatInt(heap[0].Val, 10) + "\n")
 
 		// open the file with the smallest value and remove the first line
 		file, err := os.Open("chunk_" + strconv.Itoa(heap[0].Idx) + ".txt")
@@ -201,7 +201,7 @@ func MergeKSortedFiles(outpath string, i int, sortDirection string) {
 			lines = lines[1:]
 
 			// write the lines back to the file
-			f, err := os.OpenFile("chunk_"+strconv.Itoa(heap[0].Idx)+".txt", os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
+			f, err := os.Create("chunk_" + strconv.Itoa(heap[0].Idx) + ".txt")
 			if err != nil {
 				os.Remove(outpath)
 				log.Fatal(err)
@@ -209,10 +209,9 @@ func MergeKSortedFiles(outpath string, i int, sortDirection string) {
 
 			w := bufio.NewWriter(f)
 			for _, v := range lines {
-				w.WriteString(v + "\r")
+				w.WriteString(v + "\n")
 			}
 			w.Flush()
-
 			f.Close()
 		}
 
@@ -311,7 +310,7 @@ func commands() {
 				// sort and merge
 				i := 0
 				SortLargeFile(filepath, r, &i, dir)
-				MergeKSortedFiles(outpath, i, dir)
+				// MergeKSortedFiles(outpath, i, dir)
 
 				fmt.Println("Sorted file saved to", outpath)
 			},
