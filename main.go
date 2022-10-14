@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"fmt"
 	"log"
 	"math/rand"
 	"os"
@@ -13,13 +12,14 @@ import (
 	"github.com/urfave/cli"
 )
 
-// create a txt file of size 100GB with each line containing a random
+// create a txt file of size with each line containing a random
 func CreateTxt(filepath string, size int64) {
 	f, err := os.Create(filepath)
 	if err != nil {
 		log.Fatal(err)
 	}
 	w := bufio.NewWriter(f)
+	log.Println("Filling file with random numbers...")
 	for i := int64(0); i < size; i++ {
 		inf, _ := f.Stat()
 		if inf.Size() >= size {
@@ -32,6 +32,7 @@ func CreateTxt(filepath string, size int64) {
 }
 
 func SortLargeFile(filepath string, ram int64, i *int, sortDirection string) {
+	log.Println("Opening file for sorting...")
 	file, err := os.Open(filepath)
 	if err != nil {
 		log.Fatal(err)
@@ -46,6 +47,7 @@ func SortLargeFile(filepath string, ram int64, i *int, sortDirection string) {
 	// read the first chunk of the file
 	var chunk []int64
 
+	log.Println("Creating chunks and performing initial sort...")
 	for scan.Scan() {
 		// append to chunk
 		value, _ := strconv.ParseInt(scan.Text(), 10, 64)
@@ -84,45 +86,38 @@ func SortLargeFile(filepath string, ram int64, i *int, sortDirection string) {
 			f.Close()
 		}
 
-		if !scan.Scan() {
+	}
 
-			fmt.Println("Sorting the last chunk...")
+	// perform flush
+	if totalRead > 0 && len(chunk) > 0 {
+		log.Println("Performing flush into last chunk...")
 
-			// sort the chunk
-			sort.SliceStable(chunk, func(i, j int) bool {
-				if sortDirection == "asc" {
-					return chunk[i] < chunk[j]
-				} else {
-					return chunk[i] > chunk[j]
-				}
-			})
-
-			// write the first chunk to a new file
-			f, err := os.Create("chunk_" + strconv.Itoa(*i) + ".txt")
-			if err != nil {
-				log.Fatal(err)
+		// sort the chunk
+		sort.SliceStable(chunk, func(i, j int) bool {
+			if sortDirection == "asc" {
+				return chunk[i] < chunk[j]
+			} else {
+				return chunk[i] > chunk[j]
 			}
+		})
 
-			w := bufio.NewWriter(f)
-			for _, v := range chunk {
-				// conver int64 to string
-				w.WriteString(strconv.FormatInt(v, 10) + "\n")
-			}
-			w.Flush()
-
-			// reset the chunk
-			chunk = []int64{}
-			totalRead = 0
-
-			f.Close()
-		} else {
-			// append to chunk
-			value, _ := strconv.ParseInt(scan.Text(), 10, 64)
-			chunk = append(chunk, value)
-			bytesLen := len(scan.Bytes())
-			totalRead += int64(bytesLen)
+		// write the first chunk to a new file
+		f, err := os.Create("chunk_" + strconv.Itoa(*i) + ".txt")
+		if err != nil {
+			log.Fatal(err)
 		}
 
+		w := bufio.NewWriter(f)
+		for _, v := range chunk {
+			w.WriteString(strconv.FormatInt(v, 10) + "\n")
+		}
+		w.Flush()
+
+		// reset the chunk
+		chunk = []int64{}
+		totalRead = 0
+
+		f.Close()
 	}
 }
 
@@ -132,6 +127,7 @@ func MergeKSortedFiles(outpath string, i int, sortDirection string) {
 		log.Fatal(err)
 	}
 
+	log.Printf("Merging %d sorted chunks into out file...\n", i+1)
 	// iterate over sorted chunk files
 	for {
 
@@ -154,7 +150,10 @@ func MergeKSortedFiles(outpath string, i int, sortDirection string) {
 
 			for scan.Scan() {
 				// save the first line to the heap
-				value, _ := strconv.ParseInt(scan.Text(), 10, 64)
+				value, err := strconv.ParseInt(scan.Text(), 10, 64)
+				if err != nil {
+					break
+				}
 				heap = append(heap, Heap{
 					Val: value,
 					Idx: j,
@@ -196,29 +195,32 @@ func MergeKSortedFiles(outpath string, i int, sortDirection string) {
 		file.Close()
 
 		if len(lines) > 1 {
-
 			// remove the first line
 			lines = lines[1:]
-
-			// write the lines back to the file
-			f, err := os.Create("chunk_" + strconv.Itoa(heap[0].Idx) + ".txt")
-			if err != nil {
-				os.Remove(outpath)
-				log.Fatal(err)
-			}
-
-			w := bufio.NewWriter(f)
-			for _, v := range lines {
-				w.WriteString(v + "\n")
-			}
-			w.Flush()
-			f.Close()
+		} else {
+			// don't remove, just set to empty
+			lines = []string{}
 		}
+
+		// write the lines back to the file
+		f, err := os.Create("chunk_" + strconv.Itoa(heap[0].Idx) + ".txt")
+		if err != nil {
+			os.Remove(outpath)
+			log.Fatal(err)
+		}
+
+		w := bufio.NewWriter(f)
+		for _, v := range lines {
+			w.WriteString(v + "\n")
+		}
+		w.Flush()
+		f.Close()
 
 		// reset the heap
 		heap = []Heap{}
 	}
 
+	log.Println("Almost done...just performing cleaups...")
 	// delete the chunk files
 	for j := 0; j <= i; j++ {
 		os.Remove("chunk_" + strconv.Itoa(j) + ".txt")
@@ -298,7 +300,7 @@ func commands() {
 					outpath = "sorted.txt"
 				}
 
-				fmt.Printf("Sorting %s with %s MB (%d bytes) of RAM in %s direction. Output file: %s\n", c.String("file"), ram, r, dir, outpath)
+				log.Printf("Sorting %s with %s MB (%d bytes) of RAM in %s direction. Output file: %s...\n", c.String("file"), ram, r, dir, outpath)
 
 				filepath := c.String("file")
 				// validate that it's a txt file
@@ -310,9 +312,9 @@ func commands() {
 				// sort and merge
 				i := 0
 				SortLargeFile(filepath, r, &i, dir)
-				// MergeKSortedFiles(outpath, i, dir)
+				MergeKSortedFiles(outpath, i, dir)
 
-				fmt.Println("Sorted file saved to", outpath)
+				log.Println("Sorted file saved to", outpath)
 			},
 		},
 
@@ -357,12 +359,12 @@ func commands() {
 					outpath = "lacronis.txt"
 				}
 
-				fmt.Printf("Creating a random txt file of size %s MB (%d bytes) at %s\n", size, s, outpath)
+				log.Printf("Creating a random txt file of size %s MB (%d bytes) at %s...\n", size, s, outpath)
 
 				// create the file
 				CreateTxt(outpath, s)
 
-				fmt.Println("Random txt file saved to", outpath)
+				log.Println("Random txt file saved to", outpath)
 			},
 		},
 	}
