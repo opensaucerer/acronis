@@ -321,7 +321,9 @@ func commands() {
 		{
 			Name:    "create",
 			Aliases: []string{"c"},
-			Usage:   "Create a txt file with random numbers",
+			Usage: `Create a txt file with random numbers
+						acronis create --size 10
+						acronis create --size 10 --outpath /path/to/output.txt`,
 			Flags: []cli.Flag{
 				&cli.StringFlag{
 					Name:     "size",
