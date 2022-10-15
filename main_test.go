@@ -13,8 +13,8 @@ var (
 	dest       = "demo.txt"
 	out        = "demo_sorted.txt"
 	dir        = "asc"
-	size int64 = 2 * 1024 * 1024
-	ram  int64 = 0.5 * 1024 * 1024
+	size int64 = 0.5 * 1024 * 1024
+	ram  int64 = 0.2 * 1000 * 1000
 	i          = 0
 )
 
@@ -97,7 +97,7 @@ func testMergeKSortedFiles(t *testing.T) {
 	MergeKSortedFiles(out, i, dir)
 
 	// check if file is sorted
-	file, err := os.Open("sorted.txt")
+	file, err := os.Open(out)
 	if err != nil {
 		t.Error(err)
 	}
