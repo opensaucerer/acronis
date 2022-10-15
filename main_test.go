@@ -11,11 +11,33 @@ import (
 
 var (
 	dest       = "demo.txt"
-	size int64 = 0.5 * 1024 * 1024
+	out        = "demo_sorted.txt"
+	dir        = "asc"
+	size int64 = 2 * 1024 * 1024
+	ram  int64 = 0.5 * 1024 * 1024
 	i          = 0
 )
 
-// test function CreateTxt - go test -v -run TestCreateTxt
+func isSorted(file *os.File, dir string) bool {
+	var prev int64
+	scan := bufio.NewScanner(file)
+	for scan.Scan() {
+		value, _ := strconv.ParseInt(scan.Text(), 10, 64)
+		if dir == "asc" {
+			if value < prev {
+				return false
+			}
+		} else {
+			if value > prev {
+				return false
+			}
+		}
+		prev = value
+	}
+	return true
+}
+
+// test function CreateTxt
 func testCreateTxt(t *testing.T) {
 
 	CreateTxt(dest, size)
@@ -49,11 +71,11 @@ func testCreateTxt(t *testing.T) {
 
 }
 
-// test function SortLargeFile - go test -v -run TestSortLargeFile
+// test function SortLargeFile
 func testSortLargeFile(t *testing.T) {
 
 	// sort the file
-	SortLargeFile(dest, size, &i, "asc")
+	SortLargeFile(dest, ram, &i, dir)
 
 	// check if file chunks are sorted
 	file, err := os.Open(fmt.Sprintf("%s_%d.txt", "chunk", i))
@@ -63,22 +85,38 @@ func testSortLargeFile(t *testing.T) {
 	defer file.Close()
 
 	// check if file is sorted
-	var prev int64
-	scan := bufio.NewScanner(file)
-	for scan.Scan() {
-		value, _ := strconv.ParseInt(scan.Text(), 10, 64)
-		if value < prev {
-			t.Error("File chunks are not sorted")
-		}
-		prev = value
+	if !isSorted(file, dir) {
+		t.Error("File is not sorted")
+	}
+}
+
+// test function MergeKSortedFiles
+func testMergeKSortedFiles(t *testing.T) {
+
+	// merge the chunks
+	MergeKSortedFiles(out, i, dir)
+
+	// check if file is sorted
+	file, err := os.Open("sorted.txt")
+	if err != nil {
+		t.Error(err)
+	}
+	defer file.Close()
+
+	// check if file is sorted
+	if !isSorted(file, dir) {
+		t.Error("File is not sorted")
 	}
 
 }
 
+// go test -v -run TestAcronis
 func TestAcronis(t *testing.T) {
 	t.Run("Should create a file of the specified size with random numbers", testCreateTxt)
 	t.Run("Should ascendingly sorted chunks of the file", testSortLargeFile)
+	t.Run("Should merge the chunks into one file", testMergeKSortedFiles)
 
+	// clean up
 	tearDown()
 }
 
@@ -87,7 +125,10 @@ func tearDown() {
 	os.Remove(dest)
 
 	// remove the chunks
-	for i := 0; i < 10; i++ {
+	for i := 0; i < int(size/ram); i++ {
 		os.Remove(fmt.Sprintf("%s_%d.txt", "chunk", i))
 	}
+
+	// remove the sorted file
+	os.Remove(out)
 }

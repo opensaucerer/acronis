@@ -20,7 +20,7 @@ func CreateTxt(filepath string, size int64) {
 	}
 	w := bufio.NewWriter(f)
 	log.Println("Filling file with random numbers...")
-	for i := int64(0); i < size; i++ {
+	for {
 		inf, _ := f.Stat()
 		if inf.Size() >= size {
 			break
@@ -186,7 +186,7 @@ func MergeKSortedFiles(outpath string, i int, sortDirection string) {
 			log.Fatal(err)
 		}
 
-		// read the first line
+		// read the lines
 		scan := bufio.NewScanner(file)
 		var lines []string
 		for scan.Scan() {
