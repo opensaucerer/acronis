@@ -2,6 +2,13 @@
 
 Simple CLI tool for sorting txt files with RAM restrictions.
 
+## Testing
+The tool contains a set of tests bundled as a suite using Go's built in testing package. After cloning the code, run the test suite using
+
+```bash
+go test -v
+```
+
 ## Installation
 
 Clone the repository and install the dependencies
