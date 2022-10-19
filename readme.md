@@ -31,7 +31,7 @@ mv acronis /usr/local/bin
 Create a file of 2GB with random numbers
 
 ```bash
-./acronis create --size 2048
+acronis create --size 2048
 ```
 
 Sort a file with 1GB of RAM in ascending order
